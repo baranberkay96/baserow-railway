@@ -1,5 +1,7 @@
 # Deploy and Host Baserow with Railway
 
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/baserow-24-no-code-database-postgres-red?referralCode=20H68q)
+
 Baserow is an open-source no-code database and Airtable alternative: build tables, views, forms and apps on top of PostgreSQL, with a REST API and real-time collaboration. This template runs Baserow 2.4 as separate services (API, web frontend, Celery workers, scheduler and gateway) with PostgreSQL 18, Redis and a Railway Bucket for files.
 
 ## About Hosting Baserow
