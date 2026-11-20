@@ -1,0 +1,34 @@
+# Baserow gateway: one public URL for the web frontend and the backend API,
+# the same routing as upstream's Caddyfile (2.4.3) minus TLS and local media
+# (Railway terminates TLS; files live in the Railway Bucket).
+{
+	admin off
+	auto_https off
+	persist_config off
+	servers {
+		# Only Railway's edge can reach this port.
+		trusted_proxies static 0.0.0.0/0 ::/0
+	}
+}
+
+:{$PORT:8080} {
+	log {
+		output stdout
+		format console
+		level WARN
+	}
+
+	@gateway_health path /_gateway/health
+	respond @gateway_health "ok" 200
+
+	@backend path /api/* /ws/* /mcp/* /assistant/*
+	handle @backend {
+		reverse_proxy {$PRIVATE_BACKEND_URL:http://backend.railway.internal:8000} {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy {$PRIVATE_WEB_FRONTEND_URL:http://web-frontend.railway.internal:3000}
+	}
+}

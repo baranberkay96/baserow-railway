@@ -1,0 +1,909 @@
+{
+  "name": "Baserow 2.4 No-Code Database (Postgres, Redis, Celery, S3)",
+  "idSeed": "Baserow 2.4 No-Code Database (Postgres, Redis, Celery, S3)",
+  "description": "Open-source Airtable alternative: API, Celery workers and Bucket files.",
+  "category": "Other",
+  "tags": [
+    "baserow",
+    "no-code",
+    "database",
+    "airtable-alternative",
+    "spreadsheet",
+    "app-builder",
+    "postgres",
+    "self-hosted"
+  ],
+  "image": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+  "upstream": {
+    "repo": "baserow/baserow",
+    "version": "2.4.3",
+    "images": {
+      "backend": "baserow/backend:2.4.3@sha256:52d77853dca3d533d1e5514b37adc763908486e74fa3ae0b35238c72658eb4c1 (released 2026-11-14)",
+      "web-frontend": "baserow/web-frontend:2.4.3@sha256:6f64f0791f0ab8252323f54d34f5ed880e70bef580825cd10920ae2d38392092",
+      "gateway": "caddy:2.11.9-alpine@sha256:003a97808e781aa9f7e75cc2f43d34d461099031faf5e20faefb9f61126836f0",
+      "postgres": "ghcr.io/railwayapp-templates/postgres-ssl:18.6@sha256:4fc833b43d2aaf6ecc9b18615f5533602b723a32d0e2efe2dae8ca0f7217c863 (= :18, ships pgvector)",
+      "redis": "redis:8.2.11@sha256:b0b01167ff47bc3868e56a967895a26be4230891a1f42a78ab61cdd227accc8d"
+    },
+    "checked": "2026-11-20"
+  },
+  "services": {
+    "Baserow": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "repo": "baranberkay96/baserow-railway",
+        "rootDirectory": "/services/gateway"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/_gateway/health",
+      "healthcheckTimeout": 300,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": true,
+      "targetPort": 8080,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "8080",
+          "description": "Port of the gateway (public domain target and healthcheck).",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "${{Backend.PRIVATE_BACKEND_URL}}",
+          "description": "Backend on the private network (/api, /ws, /mcp, /assistant).",
+          "required": false
+        },
+        "PRIVATE_WEB_FRONTEND_URL": {
+          "defaultValue": "http://${{Frontend.RAILWAY_PRIVATE_DOMAIN}}:3000",
+          "description": "Web frontend on the private network (everything else).",
+          "required": false
+        }
+      }
+    },
+    "Backend": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "repo": "baranberkay96/baserow-railway",
+        "rootDirectory": "/services/backend"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/api/_health/",
+      "healthcheckTimeout": 1200,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "8000",
+          "description": "Port of the backend API (healthcheck).",
+          "required": false
+        },
+        "BASEROW_BACKEND_PORT": {
+          "defaultValue": "8000",
+          "description": "Port gunicorn listens on.",
+          "required": false
+        },
+        "BASEROW_BACKEND_BIND_ADDRESS": {
+          "defaultValue": "[::]",
+          "description": "Listen on IPv4 and IPv6 (Railway private network).",
+          "required": false
+        },
+        "BASEROW_PUBLIC_URL": {
+          "defaultValue": "https://${{Baserow.RAILWAY_PUBLIC_DOMAIN}}",
+          "description": "Public URL of Baserow (the Baserow gateway service). Change it when you add a custom domain, here only; the other services reference it.",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "http://${{RAILWAY_PRIVATE_DOMAIN}}:8000",
+          "description": "Backend URL on the private network (used by the frontend, the gateway and internal tools).",
+          "required": false
+        },
+        "BASEROW_EXTRA_ALLOWED_HOSTS": {
+          "defaultValue": "${{RAILWAY_PRIVATE_DOMAIN}},healthcheck.railway.app",
+          "description": "Extra Host headers Django accepts: the private name and Railway's healthcheck.",
+          "required": false
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Django secret key, shared with the Celery services. Keep it stable.",
+          "required": false
+        },
+        "BASEROW_JWT_SIGNING_KEY": {
+          "defaultValue": "${{secret(64, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789\")}}",
+          "description": "Signs login tokens. Changing it signs everyone out.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Postgres.DATABASE_URL}}",
+          "description": "PostgreSQL connection over the private network (pgvector is enabled automatically).",
+          "required": false
+        },
+        "REDIS_URL": {
+          "defaultValue": "${{Redis.REDIS_URL}}",
+          "description": "Redis for cache, realtime updates and the Celery queues.",
+          "required": false
+        },
+        "BASEROW_OSS_ONLY": {
+          "defaultValue": "true",
+          "description": "true = load only the MIT-licensed open-source edition (no premium/enterprise code). Empty = load them too; they need a paid Baserow licence.",
+          "required": false
+        },
+        "BASEROW_AMOUNT_OF_GUNICORN_WORKERS": {
+          "defaultValue": "2",
+          "description": "API worker processes (each ~200-300 MB).",
+          "required": false
+        },
+        "BASEROW_AMOUNT_OF_WORKERS": {
+          "defaultValue": "1",
+          "description": "Celery concurrency per worker service (default would follow the host's CPU count).",
+          "required": false
+        },
+        "BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER": {
+          "defaultValue": "yes",
+          "description": "Trust X-Forwarded-Proto from Railway's HTTPS edge.",
+          "required": false
+        },
+        "BASEROW_POSTGRES_STARTUP_CHECK_ATTEMPTS": {
+          "defaultValue": "120",
+          "description": "Postgres connection attempts on start (Postgres may still be starting).",
+          "required": false
+        },
+        "BASEROW_ADMIN_EMAIL": {
+          "defaultValue": "admin@example.com",
+          "description": "E-mail (login) of the first admin, created on the first start before the API listens. Change it later in account settings.",
+          "required": false
+        },
+        "BASEROW_ADMIN_PASSWORD": {
+          "defaultValue": "${{secret(24, \"abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789\")}}",
+          "description": "Password of the first admin (8-256 chars). Generated; read it here to log in.",
+          "required": false
+        },
+        "BASEROW_ADMIN_NAME": {
+          "defaultValue": "Admin",
+          "description": "Display name of the first admin.",
+          "required": false
+        },
+        "BASEROW_ADMIN_RESET_PASSWORD": {
+          "defaultValue": "false",
+          "description": "true = on the next start, set the password of BASEROW_ADMIN_EMAIL to BASEROW_ADMIN_PASSWORD. Set back to false afterwards.",
+          "required": false
+        },
+        "BASEROW_ALLOW_NEW_SIGNUPS": {
+          "defaultValue": "false",
+          "description": "Applied once at the first start: false = only invited people can sign up. Change later in Admin > Settings.",
+          "required": false
+        },
+        "AWS_STORAGE_BUCKET_NAME": {
+          "defaultValue": "${{Bucket.BUCKET}}",
+          "description": "Railway Bucket for uploaded files, thumbnails and exports (shared by the backend and the Celery workers).",
+          "required": false
+        },
+        "AWS_ACCESS_KEY_ID": {
+          "defaultValue": "${{Bucket.ACCESS_KEY_ID}}",
+          "description": "Railway Bucket access key.",
+          "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+          "defaultValue": "${{Bucket.SECRET_ACCESS_KEY}}",
+          "description": "Railway Bucket secret key.",
+          "required": false
+        },
+        "AWS_S3_REGION_NAME": {
+          "defaultValue": "${{Bucket.REGION}}",
+          "description": "Railway Bucket region.",
+          "required": false
+        },
+        "AWS_S3_ENDPOINT_URL": {
+          "defaultValue": "${{Bucket.ENDPOINT}}",
+          "description": "Railway Bucket S3 endpoint.",
+          "required": false
+        },
+        "AWS_S3_ADDRESSING_STYLE": {
+          "defaultValue": "virtual",
+          "description": "Railway Buckets use virtual-hosted-style URLs.",
+          "required": false
+        },
+        "AWS_S3_SIGNATURE_VERSION": {
+          "defaultValue": "s3v4",
+          "description": "Signature version for signed file URLs.",
+          "required": false
+        },
+        "AWS_DEFAULT_ACL": {
+          "defaultValue": "private",
+          "description": "Files stay private; browsers get signed URLs.",
+          "required": false
+        },
+        "AWS_QUERYSTRING_AUTH": {
+          "defaultValue": "true",
+          "description": "Serve files through signed, expiring URLs.",
+          "required": false
+        },
+        "AWS_QUERYSTRING_EXPIRE": {
+          "defaultValue": "86400",
+          "description": "Lifetime of signed file URLs in seconds (1 day).",
+          "required": false
+        },
+        "BASEROW_BUCKET_CORS": {
+          "defaultValue": "true",
+          "description": "Set the Bucket CORS rule for BASEROW_PUBLIC_URL on each start (file previews in the browser). false = leave it alone.",
+          "required": false
+        },
+        "EMAIL_SMTP": {
+          "defaultValue": "",
+          "description": "Optional: set to true to send e-mail (invitations, password resets, notifications) through SMTP. Outbound SMTP needs Railway Pro.",
+          "required": false
+        },
+        "EMAIL_SMTP_HOST": {
+          "defaultValue": "",
+          "description": "Optional SMTP server.",
+          "required": false
+        },
+        "EMAIL_SMTP_PORT": {
+          "defaultValue": "",
+          "description": "Optional SMTP port, e.g. 587.",
+          "required": false
+        },
+        "EMAIL_SMTP_USE_TLS": {
+          "defaultValue": "",
+          "description": "Optional: true for STARTTLS.",
+          "required": false
+        },
+        "EMAIL_SMTP_USER": {
+          "defaultValue": "",
+          "description": "Optional SMTP user.",
+          "required": false
+        },
+        "EMAIL_SMTP_PASSWORD": {
+          "defaultValue": "",
+          "description": "Optional SMTP password.",
+          "required": false
+        },
+        "FROM_EMAIL": {
+          "defaultValue": "",
+          "description": "Optional sender address, e.g. baserow@example.com.",
+          "required": false
+        }
+      }
+    },
+    "Frontend": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "image": "baserow/web-frontend:2.4.3@sha256:6f64f0791f0ab8252323f54d34f5ed880e70bef580825cd10920ae2d38392092"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": "/_health/",
+      "healthcheckTimeout": 600,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "PORT": {
+          "defaultValue": "3000",
+          "description": "Port of the Nuxt server (healthcheck).",
+          "required": false
+        },
+        "NITRO_PORT": {
+          "defaultValue": "3000",
+          "description": "Port the Nuxt server listens on.",
+          "required": false
+        },
+        "NITRO_HOST": {
+          "defaultValue": "::",
+          "description": "Listen on IPv4 and IPv6 (Railway private network).",
+          "required": false
+        },
+        "BASEROW_PUBLIC_URL": {
+          "defaultValue": "${{Backend.BASEROW_PUBLIC_URL}}",
+          "description": "Same as on Backend (reference).",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "${{Backend.PRIVATE_BACKEND_URL}}",
+          "description": "Backend URL for server-side rendering.",
+          "required": false
+        },
+        "BASEROW_OSS_ONLY": {
+          "defaultValue": "${{Backend.BASEROW_OSS_ONLY}}",
+          "description": "Same as on Backend: load only the open-source modules.",
+          "required": false
+        }
+      }
+    },
+    "Celery Worker": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "image": "baserow/backend:2.4.3@sha256:52d77853dca3d533d1e5514b37adc763908486e74fa3ae0b35238c72658eb4c1"
+      },
+      "startCommand": "/usr/bin/tini -- /bin/bash /baserow/backend/docker/docker-entrypoint.sh celery-worker",
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "BASEROW_PUBLIC_URL": {
+          "defaultValue": "${{Backend.BASEROW_PUBLIC_URL}}",
+          "description": "Same as on Backend (reference). Public URL of Baserow (the Baserow gateway service).",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "${{Backend.PRIVATE_BACKEND_URL}}",
+          "description": "Same as on Backend (reference). Backend URL on the private network (used by the frontend, the gateway and internal tools)..",
+          "required": false
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{Backend.SECRET_KEY}}",
+          "description": "Same as on Backend (reference). Django secret key, shared with the Celery services.",
+          "required": false
+        },
+        "BASEROW_JWT_SIGNING_KEY": {
+          "defaultValue": "${{Backend.BASEROW_JWT_SIGNING_KEY}}",
+          "description": "Same as on Backend (reference). Signs login tokens.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Backend.DATABASE_URL}}",
+          "description": "Same as on Backend (reference). PostgreSQL connection over the private network (pgvector is enabled automatically)..",
+          "required": false
+        },
+        "REDIS_URL": {
+          "defaultValue": "${{Backend.REDIS_URL}}",
+          "description": "Same as on Backend (reference). Redis for cache, realtime updates and the Celery queues..",
+          "required": false
+        },
+        "BASEROW_OSS_ONLY": {
+          "defaultValue": "${{Backend.BASEROW_OSS_ONLY}}",
+          "description": "Same as on Backend (reference). true = load only the MIT-licensed open-source edition (no premium/enterprise code).",
+          "required": false
+        },
+        "BASEROW_AMOUNT_OF_WORKERS": {
+          "defaultValue": "${{Backend.BASEROW_AMOUNT_OF_WORKERS}}",
+          "description": "Same as on Backend (reference). Celery concurrency per worker service (default would follow the host's CPU count)..",
+          "required": false
+        },
+        "AWS_STORAGE_BUCKET_NAME": {
+          "defaultValue": "${{Backend.AWS_STORAGE_BUCKET_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket for uploaded files, thumbnails and exports (shared by the backend and the Celery workers)..",
+          "required": false
+        },
+        "AWS_ACCESS_KEY_ID": {
+          "defaultValue": "${{Backend.AWS_ACCESS_KEY_ID}}",
+          "description": "Same as on Backend (reference). Railway Bucket access key..",
+          "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+          "defaultValue": "${{Backend.AWS_SECRET_ACCESS_KEY}}",
+          "description": "Same as on Backend (reference). Railway Bucket secret key..",
+          "required": false
+        },
+        "AWS_S3_REGION_NAME": {
+          "defaultValue": "${{Backend.AWS_S3_REGION_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket region..",
+          "required": false
+        },
+        "AWS_S3_ENDPOINT_URL": {
+          "defaultValue": "${{Backend.AWS_S3_ENDPOINT_URL}}",
+          "description": "Same as on Backend (reference). Railway Bucket S3 endpoint..",
+          "required": false
+        },
+        "AWS_S3_ADDRESSING_STYLE": {
+          "defaultValue": "${{Backend.AWS_S3_ADDRESSING_STYLE}}",
+          "description": "Same as on Backend (reference). Railway Buckets use virtual-hosted-style URLs..",
+          "required": false
+        },
+        "AWS_S3_SIGNATURE_VERSION": {
+          "defaultValue": "${{Backend.AWS_S3_SIGNATURE_VERSION}}",
+          "description": "Same as on Backend (reference). Signature version for signed file URLs..",
+          "required": false
+        },
+        "AWS_DEFAULT_ACL": {
+          "defaultValue": "${{Backend.AWS_DEFAULT_ACL}}",
+          "description": "Same as on Backend (reference). Files stay private; browsers get signed URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_AUTH": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_AUTH}}",
+          "description": "Same as on Backend (reference). Serve files through signed, expiring URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_EXPIRE": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_EXPIRE}}",
+          "description": "Same as on Backend (reference). Lifetime of signed file URLs in seconds (1 day)..",
+          "required": false
+        },
+        "EMAIL_SMTP": {
+          "defaultValue": "${{Backend.EMAIL_SMTP}}",
+          "description": "Same as on Backend (reference). Optional: set to true to send e-mail (invitations, password resets, notifications) through SMTP.",
+          "required": false
+        },
+        "EMAIL_SMTP_HOST": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_HOST}}",
+          "description": "Same as on Backend (reference). Optional SMTP server..",
+          "required": false
+        },
+        "EMAIL_SMTP_PORT": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PORT}}",
+          "description": "Same as on Backend (reference). Optional SMTP port, e.g.",
+          "required": false
+        },
+        "EMAIL_SMTP_USE_TLS": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USE_TLS}}",
+          "description": "Same as on Backend (reference). Optional: true for STARTTLS..",
+          "required": false
+        },
+        "EMAIL_SMTP_USER": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USER}}",
+          "description": "Same as on Backend (reference). Optional SMTP user..",
+          "required": false
+        },
+        "EMAIL_SMTP_PASSWORD": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PASSWORD}}",
+          "description": "Same as on Backend (reference). Optional SMTP password..",
+          "required": false
+        },
+        "FROM_EMAIL": {
+          "defaultValue": "${{Backend.FROM_EMAIL}}",
+          "description": "Same as on Backend (reference). Optional sender address, e.g.",
+          "required": false
+        },
+        "BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER": {
+          "defaultValue": "${{Backend.BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER}}",
+          "description": "Same as on Backend (reference). Trust X-Forwarded-Proto from Railway's HTTPS edge..",
+          "required": false
+        }
+      }
+    },
+    "Export Worker": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "image": "baserow/backend:2.4.3@sha256:52d77853dca3d533d1e5514b37adc763908486e74fa3ae0b35238c72658eb4c1"
+      },
+      "startCommand": "/usr/bin/tini -- /bin/bash /baserow/backend/docker/docker-entrypoint.sh celery-exportworker",
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "BASEROW_PUBLIC_URL": {
+          "defaultValue": "${{Backend.BASEROW_PUBLIC_URL}}",
+          "description": "Same as on Backend (reference). Public URL of Baserow (the Baserow gateway service).",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "${{Backend.PRIVATE_BACKEND_URL}}",
+          "description": "Same as on Backend (reference). Backend URL on the private network (used by the frontend, the gateway and internal tools)..",
+          "required": false
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{Backend.SECRET_KEY}}",
+          "description": "Same as on Backend (reference). Django secret key, shared with the Celery services.",
+          "required": false
+        },
+        "BASEROW_JWT_SIGNING_KEY": {
+          "defaultValue": "${{Backend.BASEROW_JWT_SIGNING_KEY}}",
+          "description": "Same as on Backend (reference). Signs login tokens.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Backend.DATABASE_URL}}",
+          "description": "Same as on Backend (reference). PostgreSQL connection over the private network (pgvector is enabled automatically)..",
+          "required": false
+        },
+        "REDIS_URL": {
+          "defaultValue": "${{Backend.REDIS_URL}}",
+          "description": "Same as on Backend (reference). Redis for cache, realtime updates and the Celery queues..",
+          "required": false
+        },
+        "BASEROW_OSS_ONLY": {
+          "defaultValue": "${{Backend.BASEROW_OSS_ONLY}}",
+          "description": "Same as on Backend (reference). true = load only the MIT-licensed open-source edition (no premium/enterprise code).",
+          "required": false
+        },
+        "BASEROW_AMOUNT_OF_WORKERS": {
+          "defaultValue": "${{Backend.BASEROW_AMOUNT_OF_WORKERS}}",
+          "description": "Same as on Backend (reference). Celery concurrency per worker service (default would follow the host's CPU count)..",
+          "required": false
+        },
+        "AWS_STORAGE_BUCKET_NAME": {
+          "defaultValue": "${{Backend.AWS_STORAGE_BUCKET_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket for uploaded files, thumbnails and exports (shared by the backend and the Celery workers)..",
+          "required": false
+        },
+        "AWS_ACCESS_KEY_ID": {
+          "defaultValue": "${{Backend.AWS_ACCESS_KEY_ID}}",
+          "description": "Same as on Backend (reference). Railway Bucket access key..",
+          "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+          "defaultValue": "${{Backend.AWS_SECRET_ACCESS_KEY}}",
+          "description": "Same as on Backend (reference). Railway Bucket secret key..",
+          "required": false
+        },
+        "AWS_S3_REGION_NAME": {
+          "defaultValue": "${{Backend.AWS_S3_REGION_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket region..",
+          "required": false
+        },
+        "AWS_S3_ENDPOINT_URL": {
+          "defaultValue": "${{Backend.AWS_S3_ENDPOINT_URL}}",
+          "description": "Same as on Backend (reference). Railway Bucket S3 endpoint..",
+          "required": false
+        },
+        "AWS_S3_ADDRESSING_STYLE": {
+          "defaultValue": "${{Backend.AWS_S3_ADDRESSING_STYLE}}",
+          "description": "Same as on Backend (reference). Railway Buckets use virtual-hosted-style URLs..",
+          "required": false
+        },
+        "AWS_S3_SIGNATURE_VERSION": {
+          "defaultValue": "${{Backend.AWS_S3_SIGNATURE_VERSION}}",
+          "description": "Same as on Backend (reference). Signature version for signed file URLs..",
+          "required": false
+        },
+        "AWS_DEFAULT_ACL": {
+          "defaultValue": "${{Backend.AWS_DEFAULT_ACL}}",
+          "description": "Same as on Backend (reference). Files stay private; browsers get signed URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_AUTH": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_AUTH}}",
+          "description": "Same as on Backend (reference). Serve files through signed, expiring URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_EXPIRE": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_EXPIRE}}",
+          "description": "Same as on Backend (reference). Lifetime of signed file URLs in seconds (1 day)..",
+          "required": false
+        },
+        "EMAIL_SMTP": {
+          "defaultValue": "${{Backend.EMAIL_SMTP}}",
+          "description": "Same as on Backend (reference). Optional: set to true to send e-mail (invitations, password resets, notifications) through SMTP.",
+          "required": false
+        },
+        "EMAIL_SMTP_HOST": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_HOST}}",
+          "description": "Same as on Backend (reference). Optional SMTP server..",
+          "required": false
+        },
+        "EMAIL_SMTP_PORT": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PORT}}",
+          "description": "Same as on Backend (reference). Optional SMTP port, e.g.",
+          "required": false
+        },
+        "EMAIL_SMTP_USE_TLS": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USE_TLS}}",
+          "description": "Same as on Backend (reference). Optional: true for STARTTLS..",
+          "required": false
+        },
+        "EMAIL_SMTP_USER": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USER}}",
+          "description": "Same as on Backend (reference). Optional SMTP user..",
+          "required": false
+        },
+        "EMAIL_SMTP_PASSWORD": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PASSWORD}}",
+          "description": "Same as on Backend (reference). Optional SMTP password..",
+          "required": false
+        },
+        "FROM_EMAIL": {
+          "defaultValue": "${{Backend.FROM_EMAIL}}",
+          "description": "Same as on Backend (reference). Optional sender address, e.g.",
+          "required": false
+        },
+        "BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER": {
+          "defaultValue": "${{Backend.BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER}}",
+          "description": "Same as on Backend (reference). Trust X-Forwarded-Proto from Railway's HTTPS edge..",
+          "required": false
+        }
+      }
+    },
+    "Celery Beat": {
+      "icon": "https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/svg/baserow.svg",
+      "source": {
+        "image": "baserow/backend:2.4.3@sha256:52d77853dca3d533d1e5514b37adc763908486e74fa3ae0b35238c72658eb4c1"
+      },
+      "startCommand": "/usr/bin/tini -- /bin/bash /baserow/backend/docker/docker-entrypoint.sh celery-beat",
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ALWAYS",
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": null,
+      "variables": {
+        "BASEROW_PUBLIC_URL": {
+          "defaultValue": "${{Backend.BASEROW_PUBLIC_URL}}",
+          "description": "Same as on Backend (reference). Public URL of Baserow (the Baserow gateway service).",
+          "required": false
+        },
+        "PRIVATE_BACKEND_URL": {
+          "defaultValue": "${{Backend.PRIVATE_BACKEND_URL}}",
+          "description": "Same as on Backend (reference). Backend URL on the private network (used by the frontend, the gateway and internal tools)..",
+          "required": false
+        },
+        "SECRET_KEY": {
+          "defaultValue": "${{Backend.SECRET_KEY}}",
+          "description": "Same as on Backend (reference). Django secret key, shared with the Celery services.",
+          "required": false
+        },
+        "BASEROW_JWT_SIGNING_KEY": {
+          "defaultValue": "${{Backend.BASEROW_JWT_SIGNING_KEY}}",
+          "description": "Same as on Backend (reference). Signs login tokens.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "${{Backend.DATABASE_URL}}",
+          "description": "Same as on Backend (reference). PostgreSQL connection over the private network (pgvector is enabled automatically)..",
+          "required": false
+        },
+        "REDIS_URL": {
+          "defaultValue": "${{Backend.REDIS_URL}}",
+          "description": "Same as on Backend (reference). Redis for cache, realtime updates and the Celery queues..",
+          "required": false
+        },
+        "BASEROW_OSS_ONLY": {
+          "defaultValue": "${{Backend.BASEROW_OSS_ONLY}}",
+          "description": "Same as on Backend (reference). true = load only the MIT-licensed open-source edition (no premium/enterprise code).",
+          "required": false
+        },
+        "BASEROW_AMOUNT_OF_WORKERS": {
+          "defaultValue": "${{Backend.BASEROW_AMOUNT_OF_WORKERS}}",
+          "description": "Same as on Backend (reference). Celery concurrency per worker service (default would follow the host's CPU count)..",
+          "required": false
+        },
+        "AWS_STORAGE_BUCKET_NAME": {
+          "defaultValue": "${{Backend.AWS_STORAGE_BUCKET_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket for uploaded files, thumbnails and exports (shared by the backend and the Celery workers)..",
+          "required": false
+        },
+        "AWS_ACCESS_KEY_ID": {
+          "defaultValue": "${{Backend.AWS_ACCESS_KEY_ID}}",
+          "description": "Same as on Backend (reference). Railway Bucket access key..",
+          "required": false
+        },
+        "AWS_SECRET_ACCESS_KEY": {
+          "defaultValue": "${{Backend.AWS_SECRET_ACCESS_KEY}}",
+          "description": "Same as on Backend (reference). Railway Bucket secret key..",
+          "required": false
+        },
+        "AWS_S3_REGION_NAME": {
+          "defaultValue": "${{Backend.AWS_S3_REGION_NAME}}",
+          "description": "Same as on Backend (reference). Railway Bucket region..",
+          "required": false
+        },
+        "AWS_S3_ENDPOINT_URL": {
+          "defaultValue": "${{Backend.AWS_S3_ENDPOINT_URL}}",
+          "description": "Same as on Backend (reference). Railway Bucket S3 endpoint..",
+          "required": false
+        },
+        "AWS_S3_ADDRESSING_STYLE": {
+          "defaultValue": "${{Backend.AWS_S3_ADDRESSING_STYLE}}",
+          "description": "Same as on Backend (reference). Railway Buckets use virtual-hosted-style URLs..",
+          "required": false
+        },
+        "AWS_S3_SIGNATURE_VERSION": {
+          "defaultValue": "${{Backend.AWS_S3_SIGNATURE_VERSION}}",
+          "description": "Same as on Backend (reference). Signature version for signed file URLs..",
+          "required": false
+        },
+        "AWS_DEFAULT_ACL": {
+          "defaultValue": "${{Backend.AWS_DEFAULT_ACL}}",
+          "description": "Same as on Backend (reference). Files stay private; browsers get signed URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_AUTH": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_AUTH}}",
+          "description": "Same as on Backend (reference). Serve files through signed, expiring URLs..",
+          "required": false
+        },
+        "AWS_QUERYSTRING_EXPIRE": {
+          "defaultValue": "${{Backend.AWS_QUERYSTRING_EXPIRE}}",
+          "description": "Same as on Backend (reference). Lifetime of signed file URLs in seconds (1 day)..",
+          "required": false
+        },
+        "EMAIL_SMTP": {
+          "defaultValue": "${{Backend.EMAIL_SMTP}}",
+          "description": "Same as on Backend (reference). Optional: set to true to send e-mail (invitations, password resets, notifications) through SMTP.",
+          "required": false
+        },
+        "EMAIL_SMTP_HOST": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_HOST}}",
+          "description": "Same as on Backend (reference). Optional SMTP server..",
+          "required": false
+        },
+        "EMAIL_SMTP_PORT": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PORT}}",
+          "description": "Same as on Backend (reference). Optional SMTP port, e.g.",
+          "required": false
+        },
+        "EMAIL_SMTP_USE_TLS": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USE_TLS}}",
+          "description": "Same as on Backend (reference). Optional: true for STARTTLS..",
+          "required": false
+        },
+        "EMAIL_SMTP_USER": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_USER}}",
+          "description": "Same as on Backend (reference). Optional SMTP user..",
+          "required": false
+        },
+        "EMAIL_SMTP_PASSWORD": {
+          "defaultValue": "${{Backend.EMAIL_SMTP_PASSWORD}}",
+          "description": "Same as on Backend (reference). Optional SMTP password..",
+          "required": false
+        },
+        "FROM_EMAIL": {
+          "defaultValue": "${{Backend.FROM_EMAIL}}",
+          "description": "Same as on Backend (reference). Optional sender address, e.g.",
+          "required": false
+        },
+        "BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER": {
+          "defaultValue": "${{Backend.BASEROW_ENABLE_SECURE_PROXY_SSL_HEADER}}",
+          "description": "Same as on Backend (reference). Trust X-Forwarded-Proto from Railway's HTTPS edge..",
+          "required": false
+        }
+      }
+    },
+    "Postgres": {
+      "icon": "https://devicons.railway.app/i/postgresql.svg",
+      "source": {
+        "image": "ghcr.io/railwayapp-templates/postgres-ssl:18.6@sha256:4fc833b43d2aaf6ecc9b18615f5533602b723a32d0e2efe2dae8ca0f7217c863"
+      },
+      "startCommand": null,
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/var/lib/postgresql/data"
+      },
+      "variables": {
+        "PGDATA": {
+          "defaultValue": "/var/lib/postgresql/data/pgdata",
+          "description": "Location where the database will be initialized",
+          "required": false
+        },
+        "PGHOST": {
+          "defaultValue": "${{RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Railway Private Domain Name.",
+          "required": false
+        },
+        "PGPORT": {
+          "defaultValue": "5432",
+          "description": "Port to connect to Postgres.",
+          "required": false
+        },
+        "PGUSER": {
+          "defaultValue": "${{ POSTGRES_USER }}",
+          "description": "Required variable for Data panel",
+          "required": false
+        },
+        "PGDATABASE": {
+          "defaultValue": "${{POSTGRES_DB}}",
+          "description": "Required variable for the data panel.",
+          "required": false
+        },
+        "PGPASSWORD": {
+          "defaultValue": "${{POSTGRES_PASSWORD}}",
+          "description": "Required variable for Data panel",
+          "required": false
+        },
+        "POSTGRES_DB": {
+          "defaultValue": "railway",
+          "description": "Default database created when image is started.",
+          "required": false
+        },
+        "DATABASE_URL": {
+          "defaultValue": "postgresql://${{PGUSER}}:${{POSTGRES_PASSWORD}}@${{RAILWAY_PRIVATE_DOMAIN}}:5432/${{PGDATABASE}}",
+          "description": "Private connection URL used by Baserow.",
+          "required": false
+        },
+        "POSTGRES_USER": {
+          "defaultValue": "postgres",
+          "description": "User to connect to Postgres DB",
+          "required": false
+        },
+        "SSL_CERT_DAYS": {
+          "defaultValue": "820",
+          "description": "SSL certificate expiry in days.",
+          "required": false
+        },
+        "POSTGRES_PASSWORD": {
+          "defaultValue": "${{ secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\") }}",
+          "description": "Password to connect to DB",
+          "required": false
+        },
+        "RAILWAY_DEPLOYMENT_DRAINING_SECONDS": {
+          "defaultValue": "60",
+          "description": "Allow Postgres to cleanly shut down",
+          "required": false
+        }
+      }
+    },
+    "Redis": {
+      "icon": "https://cdn.sanity.io/images/sy1jschh/production/0ce0bfdcfbdbf69662b1116671f97c2dd788b655-157x157.svg",
+      "source": {
+        "image": "redis:8.2.11@sha256:b0b01167ff47bc3868e56a967895a26be4230891a1f42a78ab61cdd227accc8d"
+      },
+      "startCommand": "/bin/sh -c \"rm -rf $RAILWAY_VOLUME_MOUNT_PATH/lost+found/ && exec docker-entrypoint.sh redis-server --requirepass $REDIS_PASSWORD --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH\"",
+      "preDeployCommand": null,
+      "healthcheckPath": null,
+      "healthcheckTimeout": null,
+      "restartPolicyType": "ON_FAILURE",
+      "restartPolicyMaxRetries": 10,
+      "numReplicas": 1,
+      "cronSchedule": null,
+      "publicDomain": false,
+      "targetPort": null,
+      "tcpProxy": null,
+      "volume": {
+        "mountPath": "/data"
+      },
+      "variables": {
+        "REDISHOST": {
+          "defaultValue": "${{RAILWAY_PRIVATE_DOMAIN}}",
+          "description": "Private network hostname of the Redis service.",
+          "required": false
+        },
+        "REDISPORT": {
+          "defaultValue": "6379",
+          "description": "Port that Redis listens on.",
+          "required": false
+        },
+        "REDISUSER": {
+          "defaultValue": "default",
+          "description": "Username for authenticating with Redis.",
+          "required": false
+        },
+        "REDIS_PASSWORD": {
+          "defaultValue": "${{ secret(32, \"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\") }}",
+          "description": "Randomly generated password for authenticating with Redis.",
+          "required": false
+        },
+        "REDISPASSWORD": {
+          "defaultValue": "${{REDIS_PASSWORD}}",
+          "description": "Alias of REDIS_PASSWORD.",
+          "required": false
+        },
+        "REDIS_URL": {
+          "defaultValue": "redis://${{ REDISUSER }}:${{ REDIS_PASSWORD }}@${{ REDISHOST }}:${{ REDISPORT }}",
+          "description": "Private connection URL used by Baserow (cache, websockets, Celery broker).",
+          "required": false
+        }
+      }
+    }
+  },
+  "buckets": [
+    "Bucket"
+  ]
+}
