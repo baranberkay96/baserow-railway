@@ -43,7 +43,21 @@ Market (2026-11): leader 523 active on `baserow/baserow:2.0.0` all-in-one (+ Pos
 
 ## Resources
 
-RESOURCES_TABLE
+Measured on Railway, 2026-11-20, idle after login, database/table/rows, file upload and CSV export:
+
+| Service | RAM | CPU idle |
+|---|---|---|
+| Backend (2 gunicorn workers) | 0.42 GB | ~0.005 vCPU |
+| Export Worker | 0.36 GB | ~0.003 |
+| Celery Worker | 0.28 GB | ~0.002 |
+| Celery Beat | 0.24 GB | ~0 |
+| Frontend | 0.18 GB | ~0 |
+| Postgres | 0.11 GB | ~0.003 |
+| Redis | 0.03 GB | ~0.002 |
+| Baserow (Caddy) | 0.01 GB | ~0 |
+
+Total ≈ 1.6 GB ≈ $16/month RAM + CPU/volume/bucket ≈ **$17-22/month**. Every service < 0.5 GB, so Trial (1 GB/service) works; Hobby recommended.
+Prices: RAM $10/GB-month, vCPU $20/month, volume $0.15/GB-month.
 
 ## Verification checklist
 
@@ -54,6 +68,8 @@ RESOURCES_TABLE
 5. Export the table as CSV (export worker) and download it from the Bucket.
 6. `GET /api/_health/full/` as admin: all checks passing.
 7. Fresh deploy with odd values (`BASEROW_ADMIN_PASSWORD=abc`, `BASEROW_ADMIN_EMAIL=bad`, `BASEROW_PUBLIC_URL=nonsense`) → SUCCESS with warnings.
+
+Checks 1-6 passed on 2026-11-20 (after two fixes: gateway health inside a `handle` block, venv Python for the helper). Check 7 is still open: the workspace's billing state blocked new deploys before it could run.
 
 ## Open questions
 
