@@ -22,7 +22,10 @@ def warn(msg):
 
 
 def wait_db():
-    import psycopg
+    try:
+        import psycopg
+    except ImportError:  # older images ship psycopg2 only
+        import psycopg2 as psycopg
 
     url = os.environ.get("DATABASE_URL", "")
     if not url:
@@ -33,8 +36,9 @@ def wait_db():
     while True:
         attempt += 1
         try:
-            with psycopg.connect(url, connect_timeout=5) as conn:
-                conn.execute("select 1")
+            conn = psycopg.connect(url, connect_timeout=5)
+            conn.cursor().execute("select 1")
+            conn.close()
             log("Postgres is reachable")
             return
         except Exception as error:  # noqa: BLE001 - any failure means "not ready yet"

@@ -9,6 +9,7 @@ set -euo pipefail
 
 ENTRY=/baserow/backend/docker/docker-entrypoint.sh
 HELPER=/railway/railway_baserow.py
+PY=/baserow/venv/bin/python
 source /baserow/venv/bin/activate
 
 case "${BASEROW_PUBLIC_URL:-}" in
@@ -29,15 +30,15 @@ if [[ ! "${BASEROW_AMOUNT_OF_GUNICORN_WORKERS:-2}" =~ ^[1-9][0-9]*$ ]]; then
   echo "[railway] WARNING: BASEROW_AMOUNT_OF_GUNICORN_WORKERS is not a positive number; using 2"
   export BASEROW_AMOUNT_OF_GUNICORN_WORKERS=2
 fi
-python "$HELPER" wait-db
+"$PY" "$HELPER" wait-db
 
 if [[ "${MIGRATE_ON_STARTUP:-true}" == "true" ]]; then
   echo "[railway] applying migrations (the first start takes a few minutes)"
-  OTEL_SERVICE_NAME=backend-migrate python /baserow/backend/src/baserow/manage.py locked_migrate
+  OTEL_SERVICE_NAME=backend-migrate "$PY" /baserow/backend/src/baserow/manage.py locked_migrate
 fi
 
-python "$HELPER" bucket-cors || echo "[railway] WARNING: bucket CORS step failed; continuing"
-python "$HELPER" admin
+"$PY" "$HELPER" bucket-cors || echo "[railway] WARNING: bucket CORS step failed; continuing"
+"$PY" "$HELPER" admin
 
 export MIGRATE_ON_STARTUP=false
 exec /bin/bash "$ENTRY" gunicorn

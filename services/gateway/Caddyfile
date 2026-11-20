@@ -18,8 +18,9 @@
 		level WARN
 	}
 
-	@gateway_health path /_gateway/health
-	respond @gateway_health "ok" 200
+	handle /_gateway/health {
+		respond "ok" 200
+	}
 
 	@backend path /api/* /ws/* /mcp/* /assistant/*
 	handle @backend {
