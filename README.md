@@ -13,7 +13,7 @@ The backend start script waits for Postgres, runs migrations, sets the Bucket's 
 ## Common Use Cases
 
 - Replace Airtable or spreadsheets with a shared database your team can edit
-- Collect data with forms and publish it in grid, gallery, kanban or calendar views
+- Collect data with forms and work with it in grid and gallery views (kanban, calendar and timeline views are premium features and are not loaded in this open-source edition)
 - Build internal tools and portals with the application builder
 - Feed other apps through Baserow's REST API and webhooks
 
